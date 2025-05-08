@@ -1,0 +1,58 @@
+Advertisements Plugin for Left 4 Dead 2
+
+This plugin displays customizable advertisements/messages to players in Left 4 Dead 2 servers. Here's what it does:
+Main Features
+
+    Customizable Advertisements:
+
+        Loads messages from cfg/sourcemod/advertisements.cfg
+
+        Creates a default config file if none exists
+
+        Supports color formatting using {color} tags (e.g., {green}, {blue})
+
+    Automatic Display:
+
+        Shows ads to players when they connect and fully load into the game
+
+        Displays ads in sequence with 10-second intervals
+
+        Only shows to real players (not bots)
+
+    Finale-Specific Messages:
+
+        Special ads marked with [finale] prefix
+
+        These only display when the campaign finale starts
+
+        Automatically detects when finale starts/ends
+
+    Admin Control:
+
+        Includes sm_reloadads command to reload the config file without restarting
+
+Default Advertisements
+
+The plugin creates these example messages if no config exists:
+
+    Welcome message
+
+    Steam group invitation
+
+    Discord server invitation
+
+    Finale-specific thank you message
+
+Technical Details
+
+    Uses SourceMod's event system to detect player connections and team changes
+
+    Handles finale events to trigger special messages
+
+    Stores ads in a dynamic array
+
+    Tracks each player's progress through the ad sequence individually
+
+    Uses timers to space out message displays
+
+The plugin helps server owners communicate important information to players automatically, while allowing full customization of the messages through a simple text file.
