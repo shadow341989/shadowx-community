@@ -10,7 +10,7 @@
 public Plugin myinfo = 
 {
     name = "L4D2 Auto Respawner",
-    author = "Your Name",
+    author = "shadowx",
     description = "Handles suicide detection, respawning, and immunity systems",
     version = PLUGIN_VERSION,
     url = ""
