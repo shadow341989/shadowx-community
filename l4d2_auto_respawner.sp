@@ -5,12 +5,12 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.1"
 
 public Plugin myinfo = 
 {
     name = "L4D2 Auto Respawner",
-    author = "shadowx",
+    author = "Your Name",
     description = "Handles suicide detection, respawning, and immunity systems",
     version = PLUGIN_VERSION,
     url = ""
@@ -149,7 +149,11 @@ public Action Timer_PardonCountdown(Handle timer, int userid)
     int client = GetClientOfUserId(userid);
     if(client == 0 || !IsClientInGame(client))
     {
-        RespawnSurvivor(client);
+        // Only respawn if player disconnected (wasn't pardoned)
+        if(g_bInPardon[client])
+        {
+            RespawnSurvivor(client);
+        }
         g_hPardonTimer[client] = null;
         return Plugin_Stop;
     }
@@ -158,6 +162,7 @@ public Action Timer_PardonCountdown(Handle timer, int userid)
     
     if(g_iPardonTime[client] <= 0)
     {
+        // Time's up - kick player and respawn
         KickClient(client, "You were kicked for committing suicide");
         RespawnSurvivor(client);
         g_hPardonTimer[client] = null;
@@ -188,7 +193,11 @@ public Action Cmd_Pardon(int client, int args)
                 g_hPardonTimer[i] = null;
             }
             
+            // Notify all players
             PrintToChatAll("\x04[Respawner] \x03%N \x01has been pardoned by \x03%N\x01.", i, client);
+            PrintToChat(i, "\x04[Respawner] You have been pardoned!");
+            
+            // Don't respawn here - player stays dead if pardoned
             return Plugin_Handled;
         }
     }
