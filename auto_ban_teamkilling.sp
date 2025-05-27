@@ -13,6 +13,7 @@
 #define TEAMKILL_TIMER_DURATION 9.0 // Time window to track teamkilling damage (9 seconds)
 #define RESET_TIMER_DURATION 3.0 // Time to reset the timer if no damage is dealt (3 seconds)
 #define FIRE_DAMAGE_IMMUNITY_DURATION 12.0 // Immunity lasts for 12 seconds after last fire damage
+#define SPECIAL_INFECTED_IMMUNITY_DURATION 5.0 // Immunity lasts for 5 seconds after special infected attack
 
 Database g_sbDb; // For sourcebans
 Database g_offensesDb; // For offenses
@@ -29,12 +30,15 @@ bool g_bIsSurvivorTeamImmune = false; // Whether the survivor team is immune to 
 int g_iSpecialInfectedAttacker[MAXPLAYERS + 1]; // Track which special infected is attacking a survivor
 bool g_bIsOnFire[MAXPLAYERS + 1]; // Track if a survivor is on fire
 float g_fLastFireDamageTime = 0.0; // Track the last time fire damage was dealt
+float g_fLastSpecialInfectedAttackTime = 0.0; // Track the last time a special infected attacked
+bool g_bRoundEndImmunity = false; // Whether immunity is active due to round end
+bool g_bTankAliveImmunity = false; // Whether immunity is active due to tank being alive
 
 public Plugin myinfo = {
     name = "Auto Ban Teamkiller",
     author = "shadowx",
     description = "Automatically bans players for teamkilling.",
-    version = "1.4.3", // Updated version
+    version = "1.4.6", // Updated version
     url = "https://shadowcommunity.us"
 };
 
@@ -84,6 +88,14 @@ public void OnPluginStart()
     HookEvent("player_death", Event_PlayerDeath);
     HookEvent("player_spawn", Event_PlayerSpawn);
 
+    // Hook round events
+    HookEvent("round_end", Event_RoundEnd);
+    HookEvent("round_start", Event_RoundStart);
+    
+    // Hook tank events
+    HookEvent("tank_spawn", Event_TankSpawn);
+    HookEvent("tank_killed", Event_TankKilled);
+
     // Add the new command to remove player offenses
     RegAdminCmd("sm_removeplayeroffense", Command_RemovePlayerOffense, ADMFLAG_BAN, "Removes a player's offenses from the database.");
 
@@ -126,10 +138,14 @@ public void OnClientDisconnect(int client)
 
 public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3])
 {
-    // Check if the survivor team is immune to friendly fire
-    if (g_bIsSurvivorTeamImmune && IsPlayerSurvivor(victim) && IsPlayerSurvivor(attacker) && attacker != victim)
+    // Check if any immunity condition is active
+    if (g_bIsSurvivorTeamImmune || g_bRoundEndImmunity || g_bTankAliveImmunity || 
+        (GetGameTime() - g_fLastSpecialInfectedAttackTime <= SPECIAL_INFECTED_IMMUNITY_DURATION))
     {
-        return Plugin_Handled; // Block friendly fire damage
+        if (IsPlayerSurvivor(victim) && IsPlayerSurvivor(attacker) && attacker != victim)
+        {
+            return Plugin_Handled; // Block friendly fire damage
+        }
     }
 
     // Check if the attacker is a valid client and the victim is a survivor (bot or client)
@@ -159,6 +175,7 @@ public void Event_SpecialInfectedAttack(Event event, const char[] name, bool don
     {
         // Track the special infected attacker
         g_iSpecialInfectedAttacker[victim] = attacker;
+        g_fLastSpecialInfectedAttackTime = GetGameTime();
 
         // Enable survivor team immunity
         EnableSurvivorTeamImmunity();
@@ -169,18 +186,27 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
 
-    if (IsValidClient(client) && IsPlayerInfected(client))
+    if (IsValidClient(client))
     {
-        // Check if the dead infected was attacking a survivor
-        for (int i = 1; i <= MaxClients; i++)
+        if (IsPlayerInfected(client))
         {
-            if (IsValidClient(i) && IsPlayerSurvivor(i) && g_iSpecialInfectedAttacker[i] == client)
+            // Check if the dead infected was attacking a survivor
+            for (int i = 1; i <= MaxClients; i++)
             {
-                g_iSpecialInfectedAttacker[i] = 0;
+                if (IsValidClient(i) && IsPlayerSurvivor(i) && g_iSpecialInfectedAttacker[i] == client)
+                {
+                    g_iSpecialInfectedAttacker[i] = 0;
 
-                // Check if survivor team immunity should be disabled
-                DisableSurvivorTeamImmunity();
+                    // Check if survivor team immunity should be disabled
+                    DisableSurvivorTeamImmunity();
+                }
             }
+        }
+        
+        // Check if tank died
+        if (GetClientTeam(client) == 3 && IsTank(client))
+        {
+            g_bTankAliveImmunity = false;
         }
     }
 }
@@ -203,6 +229,26 @@ public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
             }
         }
     }
+}
+
+public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
+{
+    g_bRoundEndImmunity = true;
+}
+
+public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+    g_bRoundEndImmunity = false;
+}
+
+public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
+{
+    g_bTankAliveImmunity = true;
+}
+
+public void Event_TankKilled(Event event, const char[] name, bool dontBroadcast)
+{
+    g_bTankAliveImmunity = false;
 }
 
 public void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
@@ -263,10 +309,13 @@ void DisableSurvivorTeamImmunity()
         }
     }
 
-    // Check if 12 seconds have passed since the last fire damage
+    // Check if immunity periods have expired
     if (shouldDisable && g_bIsSurvivorTeamImmune)
     {
-        if (GetGameTime() - g_fLastFireDamageTime >= FIRE_DAMAGE_IMMUNITY_DURATION)
+        bool fireImmunityExpired = (GetGameTime() - g_fLastFireDamageTime >= FIRE_DAMAGE_IMMUNITY_DURATION);
+        bool siImmunityExpired = (GetGameTime() - g_fLastSpecialInfectedAttackTime >= SPECIAL_INFECTED_IMMUNITY_DURATION);
+        
+        if (fireImmunityExpired && siImmunityExpired)
         {
             g_bIsSurvivorTeamImmune = false;
         }
@@ -282,6 +331,13 @@ public Action Timer_CheckImmunity(Handle timer)
 
 public Action Timer_CheckTeamKill(Handle timer, int attacker)
 {
+    // Check if any immunity is active
+    if (g_bIsSurvivorTeamImmune || g_bRoundEndImmunity || g_bTankAliveImmunity || 
+        (GetGameTime() - g_fLastSpecialInfectedAttackTime <= SPECIAL_INFECTED_IMMUNITY_DURATION))
+    {
+        return Plugin_Stop;
+    }
+
     // Check if the attacker is still dealing damage
     if (GetGameTime() - g_fLastDamageTime[attacker] <= RESET_TIMER_DURATION)
     {
@@ -495,6 +551,16 @@ bool IsPlayerInfected(int client)
 {
     // Check if the client is valid and on the infected team (team 3)
     return IsValidClient(client) && GetClientTeam(client) == 3;
+}
+
+bool IsTank(int client)
+{
+    if (!IsValidClient(client) || !IsPlayerInfected(client))
+        return false;
+    
+    char model[128];
+    GetClientModel(client, model, sizeof(model));
+    return StrContains(model, "hulk") != -1 || StrContains(model, "tank") != -1;
 }
 
 void LoadPlayerOffenses()
