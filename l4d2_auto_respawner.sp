@@ -5,12 +5,12 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define PLUGIN_VERSION "1.1"
+#define PLUGIN_VERSION "1.0"
 
 public Plugin myinfo = 
 {
     name = "L4D2 Auto Respawner",
-    author = "Your Name",
+    author = "shadowx",
     description = "Handles suicide detection, respawning, and immunity systems",
     version = PLUGIN_VERSION,
     url = ""
