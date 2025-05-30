@@ -12,7 +12,7 @@ public Plugin myinfo =
 {
     name = "L4D2 Witch Mod",
     author = "shadowx",
-    description = "Spawns witches and awards points without Left4DHooks",
+    description = "Spawns witches and awards points",
     version = PLUGIN_VERSION,
     url = "https://github.com/shadow341989/shadowx-community"
 };
