@@ -10,7 +10,7 @@
 
 public Plugin myinfo = 
 {
-    name = "L4D2 Witch Mod (No Extension)",
+    name = "L4D2 Witch Mod",
     author = "shadowx",
     description = "Spawns witches and awards points without Left4DHooks",
     version = PLUGIN_VERSION,
