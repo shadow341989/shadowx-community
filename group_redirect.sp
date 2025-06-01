@@ -10,10 +10,10 @@ ConVar g_cvSteamGroup;
 public Plugin myinfo = 
 {
     name = "Steam Group Redirect",
-    author = "Your Name",
+    author = "shadowx",
     description = "Provides !group command to redirect players to your Steam group",
     version = PLUGIN_VERSION,
-    url = "https://yourwebsite.com"
+    url = "https://github.com/shadow341989/shadowx-community"
 };
 
 public void OnPluginStart()
