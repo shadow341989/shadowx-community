@@ -12,10 +12,10 @@
 public Plugin myinfo = 
 {
     name = "Score Difference Display",
-    author = "Your Name",
+    author = "shadowx",
     description = "Displays score differences between teams after each round",
     version = PLUGIN_VERSION,
-    url = "https://yourwebsite.com"
+    url = "https://github.com/shadow341989/shadowx-community"
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
