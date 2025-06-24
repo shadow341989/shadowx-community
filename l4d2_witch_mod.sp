@@ -4,15 +4,15 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.2.0"
+#define PLUGIN_VERSION "1.1"
 #define WITCH_CLASSNAME "witch"
-#define SPAWN_ENTITY "info_versus_spawn" // Default L4D2 spawn point entity
+#define SPAWN_ENTITY "info_versus_spawn"
 
 public Plugin myinfo = 
 {
-    name = "L4D2 Witch Mod",
+    name = "L4D2 Witch Mod (Walking Edition)",
     author = "shadowx",
-    description = "Spawns witches and awards points",
+    description = "Spawns witches",
     version = PLUGIN_VERSION,
     url = "https://github.com/shadow341989/shadowx-community"
 };
@@ -20,10 +20,12 @@ public Plugin myinfo =
 ConVar g_cvEnabled;
 ConVar g_cvWitchCount;
 ConVar g_cvBonusPoints;
+ConVar g_cvWalkChance; // New: Walking witch chance
 
 bool g_bEnabled;
 int g_iWitchCount;
 int g_iBonusPoints;
+float g_fWalkChance; // New: Stores walk chance
 int g_iWitchesKilled;
 int g_iSpawnedWitches;
 
@@ -34,6 +36,7 @@ public void OnPluginStart()
     g_cvEnabled = CreateConVar("l4d2_witch_mod_enabled", "1", "Enable/Disable the Witch Mod plugin", FCVAR_NONE, true, 0.0, true, 1.0);
     g_cvWitchCount = CreateConVar("z_number_witches", "1", "Number of witches to spawn per round", FCVAR_NONE, true, 0.0);
     g_cvBonusPoints = CreateConVar("l4d2_witch_mod_bonus_points", "10", "Bonus points awarded per witch kill (5-50)", FCVAR_NONE, true, 5.0, true, 50.0);
+    g_cvWalkChance = CreateConVar("l4d2_witch_mod_walk_chance", "0.4", "Chance (0.0-1.0) for a witch to spawn as a walking witch", FCVAR_NONE, true, 0.0, true, 1.0);
     
     HookEvent("witch_killed", Event_WitchKilled);
     HookEvent("round_end", Event_RoundEnd, EventHookMode_PostNoCopy);
@@ -41,6 +44,7 @@ public void OnPluginStart()
     HookConVarChange(g_cvEnabled, OnConVarChanged);
     HookConVarChange(g_cvWitchCount, OnConVarChanged);
     HookConVarChange(g_cvBonusPoints, OnConVarChanged);
+    HookConVarChange(g_cvWalkChance, OnConVarChanged);
     
     AutoExecConfig(true, "witchmod");
     UpdateCvars();
@@ -56,6 +60,7 @@ void UpdateCvars()
     g_bEnabled = g_cvEnabled.BoolValue;
     g_iWitchCount = g_cvWitchCount.IntValue;
     g_iBonusPoints = g_cvBonusPoints.IntValue;
+    g_fWalkChance = g_cvWalkChance.FloatValue; // New: Update walk chance
 }
 
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -65,7 +70,6 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
     
     if (!g_bEnabled || g_iWitchCount <= 0) return;
     
-    // Delay spawning to ensure map is fully loaded
     CreateTimer(5.0, Timer_SpawnWitches, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -91,16 +95,14 @@ public Action Timer_SpawnWitches(Handle timer)
 
 bool FindWitchSpawnPosition(float spawnPos[3])
 {
-    // Try to find a valid spawn point entity first
     int spawnEnt = FindRandomEntity(SPAWN_ENTITY);
     if (spawnEnt != -1)
     {
         GetEntPropVector(spawnEnt, Prop_Data, "m_vecOrigin", spawnPos);
-        spawnPos[2] += 20.0; // Slightly raise to prevent stuck
+        spawnPos[2] += 20.0;
         return IsPositionSafe(spawnPos);
     }
     
-    // Fallback: Use survivor positions + random offset
     int survivor = GetRandomSurvivor();
     if (survivor != -1)
     {
@@ -119,9 +121,18 @@ void SpawnWitch(const float spawnPos[3])
     int witch = CreateEntityByName(WITCH_CLASSNAME);
     if (witch != -1 && IsValidEntity(witch))
     {
-        DispatchKeyValue(witch, "Angry", "0"); // Non-raging witch
+        // 40% chance to be a walking witch (angry)
+        bool bWalkingWitch = (GetRandomFloat(0.0, 1.0) <= g_fWalkChance;
+        
+        DispatchKeyValue(witch, "Angry", bWalkingWitch ? "1" : "0");
         DispatchSpawn(witch);
         TeleportEntity(witch, spawnPos, NULL_VECTOR, NULL_VECTOR);
+        
+        // Optional: Adjust speed for walking witches
+        if (bWalkingWitch)
+        {
+            SetEntPropFloat(witch, Prop_Data, "m_speed", 100.0); // Slower than raging speed
+        }
     }
 }
 
@@ -143,7 +154,6 @@ int CountWitches()
 
 bool IsPositionSafe(const float pos[3])
 {
-    // Check if the position is clear of obstructions
     TR_TraceHullFilter(pos, pos, view_as<float>({-16.0, -16.0, 0.0}), view_as<float>({16.0, 16.0, 72.0}), 
         MASK_PLAYERSOLID, TraceEntityFilterPlayers);
     
@@ -152,7 +162,7 @@ bool IsPositionSafe(const float pos[3])
 
 public bool TraceEntityFilterPlayers(int entity, int contentsMask)
 {
-    return entity > MaxClients; // Ignore players and survivors
+    return entity > MaxClients;
 }
 
 public void Event_WitchKilled(Event event, const char[] name, bool dontBroadcast)
