@@ -10,7 +10,7 @@
 
 public Plugin myinfo = 
 {
-    name = "L4D2 Witch Mod (Walking Edition)",
+    name = "L4D2 Witch Mod",
     author = "shadowx",
     description = "Spawns witches",
     version = PLUGIN_VERSION,
